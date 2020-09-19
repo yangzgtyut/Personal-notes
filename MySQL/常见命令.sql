@@ -2623,3 +2623,247 @@ END /
 
 CALL myp7('1995-12-26', @日期)/
 SELECT @日期/
+
+
+
+# 函数
+
+# 创建
+DELIMITER /
+# ------------------案例--------------------------
+# 1.无参有返回
+# 案例：返回公司的员工个数
+CREATE FUNCTION myf1() RETURNS INT
+BEGIN
+	DECLARE c INT DEFAULT 0;
+	SELECT COUNT(*) INTO c FROM employees;
+	RETURN c;
+END /
+
+# 调用
+SELECT myf1()/
+
+# 有参又返回
+# 案例1：根据员工名返回工资
+CREATE FUNCTION myf2(员工名 VARCHAR(20)) RETURNS DOUBLE
+BEGIN
+	SET @sal=0;  # 定义用户变量
+	SELECT salary INTO @sal FROM employees WHERE last_name=员工名;
+	RETURN @sal;
+END /
+
+SELECT myf2('Ernst')/
+
+# 案例2：根据部门名返回该部门的平均工资
+CREATE FUNCTION myf3(部门名 VARCHAR(20)) RETURNS DOUBLE
+BEGIN
+	DECLARE sal DOUBLE;
+	SELECT AVG(salary) INTO sal
+	FROM employees e
+	INNER JOIN departments d ON e.`department_id`=d.`department_id`
+	WHERE 部门名=d.`department_name`;
+	# group by department_id; 不需要分组，因为在where里面已经选出了该部门
+	RETURN sal;
+END /
+
+SELECT myf3('IT')/
+
+# 创建函数：要求传入两个float，返回二者之和
+USE test;
+CREATE FUNCTION myf4(a FLOAT, b FLOAT) RETURNS FLOAT
+BEGIN
+	DECLARE two_sum FLOAT DEFAULT 0;
+	SELECT a+b INTO two_sum;
+	RETURN two_sum;
+END/
+
+
+
+# 查看函数
+SHOW CREATE FUNCTION myf3;
+
+# 删除函数
+DROP FUNCTION myf3;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#  流程控制结构
+
+# ----------------IF函数
+
+# ----------------case语句
+
+# 案例
+DELIMITER /
+# 创建存储过程，根据传入的成绩，显示等级，例如：成绩在90-100，显示A，80-89，显示B，60-79，显示C，否则显示D
+CREATE PROCEDURE test_case(IN grade INT)
+BEGIN
+	DECLARE class CHAR;
+	CASE
+	WHEN grade>=90 THEN SET class='A';
+	WHEN grade>=80 THEN SET class='B';
+	WHEN grade>=60 THEN SET class='C';
+	ELSE SET class='D';
+	END CASE;
+	SELECT class;
+END /
+
+CALL test_case(94) /
+
+# ----------------IF分支结构
+# 位置：应用在begin
+# 案例1：根据传入的成绩，显示等级，例如：成绩在90-100，返回A，80-89，返回B，60-79，返回C，否则返回D
+DELIMITER /
+CREATE FUNCTION test_if(score INT) RETURNS CHAR
+BEGIN
+	IF score BETWEEN 90 AND 100 THEN RETURN 'A';
+	ELSEIF score BETWEEN 80 AND 89 THEN RETURN 'B';
+	ELSEIF score BETWEEN 60 AND 79 THEN RETURN 'C';
+	ELSE RETURN 'D';
+	END IF;
+END /
+SELECT test_if(86)/
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 循环结构
+
+# 案例：批量插入，根据次数插入到admin表中多条记录
+DROP PROCEDURE pro_while;
+CREATE PROCEDURE pro_while(IN insertcount INT)
+BEGIN
+	DECLARE i INT DEFAULT 1;
+	WHILE i<=insertcount DO
+		INSERT INTO admin(`username`, `password`) VALUES(CONCAT('Rose', i), '666');
+		SET i=i+1;
+	END WHILE;
+END /
+
+CALL pro_while(100)/
+
+# 添加leave语句
+# 案例：批量插入，根据次数插入到admin表中多条记录, 最多插入20次
+CREATE PROCEDURE pro_while2(IN insertcount INT)
+BEGIN
+	DECLARE i INT DEFAULT 1;
+	a: WHILE i<=insertcount DO
+		INSERT INTO admin(`username`, `password`) VALUES(CONCAT('jack', i), '666');
+		SET i=i+1;
+		IF i>20 THEN LEAVE a;
+		END IF;
+	END WHILE a;
+END /
+
+CALL test_while2(50)/
+
+# 添加iterate语句
+# 只插入偶数次
+CREATE PROCEDURE pro_while3(IN insertcount INT)
+BEGIN
+	DECLARE i INT DEFAULT 0;
+	a: WHILE i<=insertcount DO
+		SET i=i+1;
+		IF i%2=1 THEN ITERATE a;
+		END IF;
+		INSERT INTO admin(`username`, `password`) VALUES(CONCAT('mike', i), '666');
+		IF i>20 THEN LEAVE a;
+		END IF;
+	END WHILE a;
+END /
+
+
+
+
+
+
+
+# 测试：
+/*
+已知表stringcontent
+其中字段：
+id 自增长
+content varchar(20)
+向该表插入指定个数的，随机的字符串
+*/
+
+CREATE TABLE stringcontent(
+	id INT PRIMARY KEY AUTO_INCREMENT,
+	content VARCHAR(20)
+);
+
+CREATE PROCEDURE random_str(IN times INT)
+BEGIN
+	DECLARE i INT DEFAULT 1;
+	DECLARE j INT DEFAULT 1;
+	DECLARE str VARCHAR(26) DEFAULT 'abcdefghigklmnopqrstuvwxyz';
+	DECLARE startindex INT DEFAULT 1;  # 起始索引
+	DECLARE str_length INT DEFAULT 1;  # 字符串的长度
+	DECLARE single_str CHAR;
+	DECLARE mid_str VARCHAR(20);
+	a: WHILE i<=times DO
+		# 获取一个随机的字符串
+		SET str_length=CEIL(RAND()*20);
+		b: WHILE j<=str_length DO
+			SET startindex=CEIL(RAND()*26); # 产生一个随机的字符
+			SET single_str=SUBSTR(str, startindex, 1);
+			IF j=1 THEN 
+				SET mid_str=single_str;
+			ELSE
+				SET mid_str=CONCAT(mid_str, single_str);
+			END IF;
+			SET j=j+1;
+		END WHILE b;
+		INSERT INTO stringcontent(`content`) VALUES(mid_str);
+		SET i=i+1;  # 循环变量自增
+	END WHILE a;
+END/
+
+
+DROP PROCEDURE random_str;
+CALL random_str(1)/
+SELECT *FROM stringcontent/
+
+SELECT CEIL(RAND()*26);
+SELECT RAND(10);
+SELECT CONCAT(NULL, 'a');

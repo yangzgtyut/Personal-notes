@@ -3531,7 +3531,7 @@ drop view 视图1, 视图2, 视图3;
 
    ```mysql
    declare 变量名 类型;
-   # 声明兵=并初始化
+   # 声明并初始化
    declare 变量名 类型 default 值;
    ```
 
@@ -3560,4 +3560,478 @@ drop view 视图1, 视图2, 视图3;
 | 定义和使用的位置 | 会话中的任何位置              | 只能在`begin end`中，且必须是第一句话       |
 | 语法             | 需要加@符号<br />不用限定类型 | set不用加@，select必须加@<br />必须添加类型 |
 
-## 
+## 存储过程和函数
+
+### 存储过程
+
+类似于Java中的方法
+
+1. 提高代码的重用性
+2. 简化代码的操作
+
+存储过程：一组预先编译好的sql语句的集合，可以理解成批处理语句
+
+好处：
+
+1. 预先编译，减少编译次数，运行效率高
+2. 减少和数据库服务器的通信次数
+
+语法：
+
+#### 创建
+
+语法：
+
+```mysql
+create procedure 存储过程名(参数列表)
+begin
+	存储过程体：一组有效合法的sql语句;
+end
+```
+
+参数列表：包含三部分
+
+1. 参数模式
+2. 参数名
+3. 参数类型
+
+举例：`in stuname varchar(20)`
+
+注意：
+
+1. 参数模式
+
+   1. `IN`：该参数可以作为输入，也就是说需要调用方传入值
+
+   2. `OUT`：作为输出，该参数可以作为返回值
+
+      存储体里面不用写return语句
+
+   3. `INOUT`：该参数既可以作为输入，也可以作为输出
+
+      既需要传入值，也可以返回值
+
+2. 如果存储过程体已有一个语句，`begin end`可以省略
+
+3. 存储过程体中的每条sql语句要求必须加分号
+
+4. 存储过程的结尾可以使用 delimiter 重新设置
+
+   ```mysql
+   delimiter 结束标记
+   delimiter $
+   ```
+
+#### 调用
+
+```mysql
+call 存储过程名(实参列表);
+```
+
+1. `in`参数——传入变量或者常量都可以
+
+2. `out`——传入用户变量
+
+   ```mysql
+   # 通过用户变量来接收返回值
+   # 方法一：外部定义一个用户变量，让其接收out参数
+   SET @boy_name=1/  # 可选，用户变量定义的同时必须赋初值
+   CALL myp5('柳岩', @boy_name)/
+   
+   # 方法二：直接在调用时的实参列表中定义用户变量
+   CALL myp5('柳岩', @boy_name)/
+   #  最后select
+   SELECT @boy_name/
+   ```
+
+3. `inout`——传入带有初值的用户变量
+
+   **==在这种模式下，调用时该参数必须传入已经有值的变量，因为既要携带参数，又要接收返回值。==**
+
+   ```mysql
+   # 案例1：闯入a和b两个值，最终a和b都返回double
+   CREATE PROCEDURE myp8(INOUT a INT, INOUT b INT)
+   BEGIN 
+   	SET a=a*2;
+   	SET b=b*2;
+   END /
+   
+   # 调用
+   # 先定义两个用户变量
+   SET @m=10;
+   SELECT @n:=20;
+   CALL myp8(@m, @n);
+   SELECT @m, @n/
+   ```
+
+#### 删除、查看存储过程
+
+
+
+```mysql
+# 删除：同视图，但是一次只能删除一个
+drop procedure 存储过程名;
+
+# 查看
+show create procedure 存过·存储过程名;
+```
+
+
+
+```mysql
+# 测试
+# 案例：创建存储过程或函数实现传入一个日期，格式化成xx年xx月xx日并返回
+
+CREATE PROCEDURE myp7(IN 日期 DATE, OUT xx VARCHAR(20))
+BEGIN 
+	SELECT DATE_FORMAT(日期, '%Y年%m月%d日') INTO xx;
+END /
+
+CALL myp7('1995-12-26', @日期)/
+SELECT @日期/
+```
+
+### 函数
+
+|        | 存储过程                     | 函数                                       |
+| ------ | ---------------------------- | ------------------------------------------ |
+| 返回值 | 0个或多个                    | 有且只有1个                                |
+| 场景   | 批量插入、批量更新（增删改） | 处理数据后返回一个结果，适合用于查询一个值 |
+
+#### 创建
+
+```mysql
+create function 函数名(参数名 参数类型[, ...]) returns 返回类型
+begin 
+	函数体;
+end /
+```
+
+注意：
+
+1. 参数列表：包含两部分
+
+   1. 参数名
+   2. 参数类型
+
+2. 肯定有`return`语句，如果没有也不会报错，但不建议
+
+3. 函数体中只有一句话时，`begin end`可以省略
+
+4. 使用`delimiter`设置结束标记
+
+   ```mysql
+   delimiter /
+   ```
+
+   结束标记不能跨会话使用
+
+#### 调用
+
+```mysql
+select 函数名(参数列表);  # 执行函数中所有的语句
+```
+
+#### 查看函数
+
+```mysql
+show create function myf3;
+```
+
+####  删除函数
+
+```mysql
+drop function 函数名;
+```
+
+```mysql
+# 案例
+
+DELIMITER /
+# ------------------案例--------------------------
+# 1.无参有返回
+# 案例：返回公司的员工个数
+CREATE FUNCTION myf1() RETURNS INT
+BEGIN
+	DECLARE c INT DEFAULT 0;
+	SELECT COUNT(*) INTO c FROM employees;
+	RETURN c;
+END /
+
+# 调用
+SELECT myf1()/
+
+# 有参又返回
+# 案例1：根据员工名返回工资
+CREATE FUNCTION myf2(员工名 VARCHAR(20)) RETURNS DOUBLE
+BEGIN
+	SET @sal=0;  # 定义用户变量
+	SELECT salary INTO @sal FROM employees WHERE last_name=员工名;
+	RETURN @sal;
+END /
+
+SELECT myf2('Ernst')/
+
+# 案例2：根据部门名返回该部门的平均工资
+CREATE FUNCTION myf3(部门名 VARCHAR(20)) RETURNS DOUBLE
+BEGIN
+	DECLARE sal DOUBLE;
+	SELECT AVG(salary) INTO sal
+	FROM employees e
+	INNER JOIN departments d ON e.`department_id`=d.`department_id`
+	WHERE 部门名=d.`department_name`;
+	# group by department_id; 不需要分组，因为在where里面已经选出了该部门
+	RETURN sal;
+END /
+
+SELECT myf3('IT')/
+```
+
+## 流程控制结构
+
+1. 顺序结构
+2. 分支结构
+3. 循环结构
+
+必须有end
+
+### 分支结构
+
+#### `IF`函数
+
+```mysql
+select if(exp1, exp2, exp3);
+```
+
+类似于三元运算符，实现简单的双分支
+
+可以应用在任何地方
+
+#### `case`结构
+
+特点：
+
+1. **既可以作为表达式嵌套在其他语句中使用，可以放在任何地方发**
+
+   **也可以作为独立的语句去使用，只能放在`begin end`中**
+
+2. 执行时，如果when中的值满足或条件成立，则执行对应的then后面的语句
+
+   若都不满足，则实行else中的语句或值
+
+   >  **可以没有else，当前面的when语句都不执行时，返回`null`。**
+
+语法：
+
+1. 类似于`switch`语句，一般用于等值判断
+
+   ```mysql
+   select
+   case 变量|表达式|字段
+   when 要判断的值1 then 返回的值1
+   when 要判断的值2 then 返回的值2
+   ...
+   [else 要返回的值n]  # 省略则前面的语句都不执行时返回null
+   end
+   
+   # 语句要+分号
+   select
+   case 变量|表达式|字段
+   when 要判断的值1 then 语句1;
+   when 要判断的值2 then 语句2;
+   ...
+   [else 语句n;]
+   end case; # 结尾是end case;
+   ```
+
+2. 类似于多重`IF`语句，一般用于实现区间判断
+
+   ```mysql
+   case
+   when 条件1 then 返回值1或语句1
+   when 条件2 then 返回值2或语句2
+   ...
+   [else 返回值n]
+   end
+   
+   
+   case
+   when 条件1 then 语句1;
+   when 条件2 then 语句2;
+   ...
+   [else 语句n;]
+   end case;
+   
+   ```
+
+```mysql
+# 案例
+# 创建存储过程，根据传入的成绩，显示等级，例如：成绩在90-100，显示A，80-89，显示B，60-79，显示C，否则显示D
+CREATE PROCEDURE test_case(IN grade INT)
+BEGIN
+	DECLARE class CHAR;
+	CASE
+	WHEN grade>=90 THEN SET class='A';
+	WHEN grade>=80 THEN SET class='B';
+	WHEN grade>=60 THEN SET class='C';
+	ELSE SET class='D';
+	END CASE;
+	SELECT class;
+END /
+
+CALL test_case(94) /
+```
+
+#### IF结构
+
+实现多重分支
+
+应用场合：只能放在`begin end`中
+
+语法：
+
+```mysql
+if 条件1 then 语句1;
+elseif 条件2 then 语句2;
+elseif 条件3 then 语句3;
+...
+[else 语句n];
+end if;
+```
+
+案例：
+
+```mysql
+# 案例1：根据传入的成绩，显示等级，例如：成绩在90-100，返回A，80-89，返回B，60-79，返回C，否则返回D
+DELIMITER /
+CREATE FUNCTION test_if(score INT) RETURNS CHAR
+BEGIN
+	IF score BETWEEN 90 AND 100 THEN RETURN 'A';
+	ELSEIF score BETWEEN 80 AND 89 THEN RETURN 'B';
+	ELSEIF score BETWEEN 60 AND 79 THEN RETURN 'C';
+	ELSE RETURN 'D';
+	END IF;
+END /
+SELECT test_if(86)/
+```
+
+### 循环结构
+
+1. `while`
+2. `loop`
+3. `repeat`
+
+循环控制（跳转语句）：
+
+1. `iterate`
+
+   类似于`continue`
+
+2. `leave`
+
+   类似于`break`
+
+#### `while`
+
+```mysql
+[标签名: ]while 循环条件 do
+	循环体;
+end while [标签名]
+```
+
+有可能执行0次
+
+```mysql
+# 案例：插入到admin表中多条记录，要求其尾值最大为20，且只能是偶数
+
+CREATE PROCEDURE pro_while3(IN insertcount INT)
+BEGIN
+	DECLARE i INT DEFAULT 0;  # 循环标志的处置需要结合其在循环中的自增位置设置
+	a: WHILE i<=insertcount DO
+		SET i=i+1;  # 由于有iterate，只能把循环标志 的自增放在开头
+		IF i%2=1 THEN ITERATE a;
+		END IF;
+		INSERT INTO admin(`username`, `password`) VALUES(CONCAT('mike', i), '666');
+		IF i>20 THEN LEAVE a;
+		END IF;
+	END WHILE a;
+END /
+```
+
+#### `loop`
+
+```mysql
+[标签名: ]loop
+	循环体;
+end loop [标签]
+
+# 可以用来模拟简单的死循环，否则必须搭配leave
+```
+
+#### `repeat`
+
+```mysql
+[标签:] repeat
+	循环体;
+until 结束循环的条件
+end repeat [标签];
+```
+
+最少执行一次
+
+
+
+
+
+
+
+```mysql
+# 测试：
+/*
+已知表stringcontent
+其中字段：
+id 自增长
+content varchar(20)
+向该表插入指定个数的，随机的字符串
+*/
+
+CREATE TABLE stringcontent(
+	id INT PRIMARY KEY AUTO_INCREMENT,
+	content VARCHAR(20)
+);
+
+CREATE PROCEDURE random_str(IN times INT)
+BEGIN
+	DECLARE i INT DEFAULT 1;
+	DECLARE j INT DEFAULT 1;
+	DECLARE str VARCHAR(26) DEFAULT 'abcdefghigklmnopqrstuvwxyz';
+	DECLARE startindex INT DEFAULT 1;  # 起始索引
+	DECLARE str_length INT DEFAULT 1;  # 字符串的长度
+	DECLARE single_str CHAR;
+	DECLARE mid_str VARCHAR(20);
+	a: WHILE i<=times DO
+		# 获取一个随机的字符串
+		SET str_length=CEIL(RAND()*20);  # content VARCHAR(20)所以最长20个字符
+		b: WHILE j<=str_length DO
+			# 产生一个随机的字符
+			SET startindex=CEIL(RAND()*26);
+			SET single_str=SUBSTR(str, startindex, 1);
+			IF j=1 THEN 
+				# mid_str 的初始化
+				SET mid_str=single_str;
+			ELSE
+				SET mid_str=CONCAT(mid_str, single_str);
+			END IF;
+			SET j=j+1;
+		END WHILE b;
+		INSERT INTO stringcontent(`content`) VALUES(mid_str);
+		SET i=i+1;
+	END WHILE a;
+END/
+
+
+# DROP PROCEDURE random_str;
+CALL random_str(1)/
+SELECT *FROM stringcontent/
+```
+
