@@ -44,8 +44,8 @@ class BoxMode(IntEnum):
     def convert(box: _RawBoxType, from_mode: "BoxMode", to_mode: "BoxMode") -> _RawBoxType:
         """
         Args:
-            box: can be a k-tuple, k-list or an Nxk array/tensor, where k = 4 or 5
-            from_mode, to_mode (BoxMode)
+            box:
+                can be a k-tuple, k-list or an Nxk array/tensor, where k = 4 or 5 from_mode, to_mode (BoxMode)
 
         Returns:
             The converted box of the same type.
@@ -61,9 +61,10 @@ class BoxMode(IntEnum):
                 "BoxMode.convert takes either a k-tuple/list or an Nxk array/tensor,"
                 " where k == 4 or 5"
             )
-            arr = torch.tensor(box)[None, :]
+            arr = torch.tensor(box)[None, :]  # 对box增加一个维度
         else:
             # avoid modifying the input box
+            # 如果是np数组，则转换为tensor
             if is_numpy:
                 arr = torch.from_numpy(np.asarray(box)).clone()
             else:
@@ -123,7 +124,7 @@ class BoxMode(IntEnum):
                 )
 
         if single_box:
-            return original_type(arr.flatten().tolist())
+            return original_type(arr.flatten().tolist())  # ✔
         if is_numpy:
             return arr.numpy()
         else:

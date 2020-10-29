@@ -2,6 +2,10 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 # File: transform.py
 
+'''
+给定一组参数，进行实际的变换操作
+'''
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -103,7 +107,7 @@ class ResizeTransform(Transform):
         assert len(img.shape) <= 4
 
         if img.dtype == np.uint8:
-            pil_image = Image.fromarray(img)
+            pil_image = Image.fromarray(img)  # 实现array到image的转换
             interp_method = interp if interp is not None else self.interp
             pil_image = pil_image.resize((self.new_w, self.new_h), interp_method)
             ret = np.asarray(pil_image)

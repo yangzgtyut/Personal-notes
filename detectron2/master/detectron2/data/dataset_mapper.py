@@ -68,21 +68,22 @@ class DatasetMapper:
         if recompute_boxes:
             assert use_instance_mask, "recompute_boxes requires instance masks"
         # fmt: off
-        self.is_train               = is_train
-        self.augmentations          = T.AugmentationList(augmentations)
-        self.image_format           = image_format
-        self.use_instance_mask      = use_instance_mask
-        self.instance_mask_format   = instance_mask_format
-        self.use_keypoint           = use_keypoint
+        self.is_train = is_train
+        self.augmentations = T.AugmentationList(augmentations)
+        self.image_format = image_format
+        self.use_instance_mask = use_instance_mask
+        self.instance_mask_format = instance_mask_format
+        self.use_keypoint = use_keypoint
         self.keypoint_hflip_indices = keypoint_hflip_indices
-        self.proposal_topk          = precomputed_proposal_topk
-        self.recompute_boxes        = recompute_boxes
+        self.proposal_topk = precomputed_proposal_topk
+        self.recompute_boxes = recompute_boxes
         # fmt: on
         logger = logging.getLogger(__name__)
         logger.info("Augmentations used in training: " + str(augmentations))
 
     @classmethod
     def from_config(cls, cfg, is_train: bool = True):
+        # * 创建augmentation
         augs = utils.build_augmentation(cfg, is_train)
         if cfg.INPUT.CROP.ENABLED and is_train:
             augs.insert(0, T.RandomCrop(cfg.INPUT.CROP.TYPE, cfg.INPUT.CROP.SIZE))
@@ -121,6 +122,7 @@ class DatasetMapper:
         dataset_dict = copy.deepcopy(dataset_dict)  # it will be modified by code below
         # USER: Write your own image loading if it's not from a file
         image = utils.read_image(dataset_dict["file_name"], format=self.image_format)
+        # 默认是"BGR"格式，ndarray，"HWC"
         utils.check_image_size(dataset_dict, image)
 
         # USER: Remove if you don't do semantic/panoptic segmentation.
@@ -129,15 +131,20 @@ class DatasetMapper:
         else:
             sem_seg_gt = None
 
+        # * 对image和sem_seg应用图像扩增
+        # todo
         aug_input = T.StandardAugInput(image, sem_seg=sem_seg_gt)
         transforms = self.augmentations(aug_input)
+        # 1、对aug_input的属性应用tfm（确定性的）
+        # 2、返回应用的确定的tfm，以便应用于其他数据
         image, sem_seg_gt = aug_input.image, aug_input.sem_seg
+        # image: np.ndarray, "HWC", "BGR"
 
+        # * 将image转换为tensor
         image_shape = image.shape[:2]  # h, w
-        # Pytorch's dataloader is efficient on torch.Tensor due to shared-memory,
-        # but not efficient on large generic data structures due to the use of pickle & mp.Queue.
-        # Therefore it's important to use torch.Tensor.
-        dataset_dict["image"] = torch.as_tensor(np.ascontiguousarray(image.transpose(2, 0, 1)))
+        # Pytorch's dataloader is efficient on torch.Tensor due to shared-memory, but not efficient on large generic data structures due to the use of pickle & mp.Queue. Therefore it's important to use torch.Tensor.
+        dataset_dict["image"] = torch.as_tensor(np.ascontiguousarray(
+            image.transpose(2, 0, 1)))  # (H, W, C) -> (C, H, W)
         if sem_seg_gt is not None:
             dataset_dict["sem_seg"] = torch.as_tensor(sem_seg_gt.astype("long"))
 
@@ -163,6 +170,7 @@ class DatasetMapper:
                     anno.pop("keypoints", None)
 
             # USER: Implement additional transformations if you have other types of data
+            # * 对其他字段应用图像扩增
             annos = [
                 utils.transform_instance_annotations(
                     obj, transforms, image_shape, keypoint_hflip_indices=self.keypoint_hflip_indices
@@ -170,15 +178,12 @@ class DatasetMapper:
                 for obj in dataset_dict.pop("annotations")
                 if obj.get("iscrowd", 0) == 0
             ]
+            # annotation["bbox"]: np.ndarray([[0, 1, 3, 4]])
             instances = utils.annotations_to_instances(
                 annos, image_shape, mask_format=self.instance_mask_format
             )
 
-            # After transforms such as cropping are applied, the bounding box may no longer
-            # tightly bound the object. As an example, imagine a triangle object
-            # [(0,0), (2,0), (0,2)] cropped by a box [(1,0),(2,2)] (XYXY format). The tight
-            # bounding box of the cropped triangle should be [(1,0),(2,1)], which is not equal to
-            # the intersection of original bounding box and the cropping box.
+            # After transforms such as cropping are applied, the bounding box may no longer tightly bound the object. As an example, imagine a triangle object [(0,0), (2,0), (0,2)] cropped by a box [(1,0),(2,2)] (XYXY format). The tight bounding box of the cropped triangle should be [(1,0),(2,1)], which is not equal to the intersection of original bounding box and the cropping box.
             if self.recompute_boxes:
                 instances.gt_boxes = instances.gt_masks.get_bounding_boxes()
             dataset_dict["instances"] = utils.filter_empty_instances(instances)

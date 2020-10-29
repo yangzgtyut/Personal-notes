@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
+用于生成随机的参数，并返回给定参数的变换方法
 Implement many useful :class:`Augmentation`.
 """
 import numpy as np
@@ -122,6 +123,8 @@ class Resize(Augmentation):
 
 class ResizeShortestEdge(Augmentation):
     """
+    将最短边缩放到给定的大小，`max_size`用于限制长边的大小
+    如果长边达到了`max_size`，则进行缩放到不超过`max_size`
     Scale the shorter edge to the given size, with a limit of `max_size` on the longer edge.
     If `max_size` is reached, then downscale so that the longer edge does not exceed max_size.
     """
@@ -131,11 +134,15 @@ class ResizeShortestEdge(Augmentation):
     ):
         """
         Args:
-            short_edge_length (list[int]): If ``sample_style=="range"``,
-                a [min, max] interval from which to sample the shortest edge length.
+            short_edge_length (list[int]):
+                训练：(800,)  测试：800
+                If ``sample_style=="range"``, a [min, max] interval from which to sample the shortest edge length.
                 If ``sample_style=="choice"``, a list of shortest edge lengths to sample from.
-            max_size (int): maximum allowed longest edge length.
-            sample_style (str): either "range" or "choice".
+            max_size (int):
+                maximum allowed longest edge length.
+            sample_style (str):
+                cfg中为 "choice"
+                either "range" or "choice".
         """
         super().__init__()
         assert sample_style in ["range", "choice"], sample_style
@@ -149,6 +156,8 @@ class ResizeShortestEdge(Augmentation):
                 f" Got {short_edge_length}!"
             )
         self._init(locals())
+        # locals() 函数会以字典类型返回当前位置的全部局部变量。
+        # 这条语句相当于把此处的局部变量变为实例本身的属性(self.。。。)
 
     def get_transform(self, img):
         h, w = img.shape[:2]
@@ -159,7 +168,7 @@ class ResizeShortestEdge(Augmentation):
         if size == 0:
             return NoOpTransform()
 
-        scale = size * 1.0 / min(h, w)
+        scale = size * 1.0 / min(h, w)  # 短边缩放的尺度
         if h < w:
             newh, neww = size, scale * w
         else:
@@ -317,7 +326,7 @@ class RandomCrop_CategoryAreaConstraint(Augmentation):
                 crop_size = self.crop_aug.get_crop_size((h, w))
                 y0 = np.random.randint(h - crop_size[0] + 1)
                 x0 = np.random.randint(w - crop_size[1] + 1)
-                sem_seg_temp = sem_seg[y0 : y0 + crop_size[0], x0 : x0 + crop_size[1]]
+                sem_seg_temp = sem_seg[y0: y0 + crop_size[0], x0: x0 + crop_size[1]]
                 labels, cnt = np.unique(sem_seg_temp, return_counts=True)
                 if self.ignored_category is not None:
                     cnt = cnt[labels != self.ignored_category]

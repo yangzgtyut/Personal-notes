@@ -172,11 +172,10 @@ def read_image(file_name, format=None):
         format (str): one of the supported image modes in PIL, or "BGR" or "YUV-BT.601".
 
     Returns:
-        image (np.ndarray): an HWC image in the given format, which is 0-255, uint8 for
-            supported image modes in PIL or "BGR"; float (0-1 for Y) for YUV-BT.601.
+        image (np.ndarray): an HWC image in the given format, which is 0-255, uint8 for supported image modes in PIL or "BGR"; float (0-1 for Y) for YUV-BT.601.
     """
     with PathManager.open(file_name, "rb") as f:
-        image = Image.open(f)
+        image = Image.open(f)  # "RGB"
 
         # work around this bug: https://github.com/python-pillow/Pillow/issues/3973
         image = _apply_exif_orientation(image)
@@ -257,6 +256,7 @@ def transform_instance_annotations(
     """
     Apply transforms to box, segmentation and keypoints annotations of a single instance.
 
+    使用`transforms.apply_box`应用于bbox
     It will use `transforms.apply_box` for the box, and
     `transforms.apply_coords` for segmentation polygons & keypoints.
     If you need anything more specially designed for each data structure,
@@ -277,11 +277,16 @@ def transform_instance_annotations(
     """
     if isinstance(transforms, (tuple, list)):
         transforms = T.TransformList(transforms)
+    # * 对bbox应用图形扩增的转换
     # bbox is 1d (per-instance bounding box)
-    bbox = BoxMode.convert(annotation["bbox"], annotation["bbox_mode"], BoxMode.XYXY_ABS)
+    bbox = BoxMode.convert(annotation["bbox"], annotation["bbox_mode"], BoxMode.XYXY_ABS)  # 一个list
     # clip transformed bbox to image size
-    bbox = transforms.apply_box(np.array([bbox]))[0].clip(min=0)
+    # * fvcore中的Transform基类对apply_box进行了定义
+    bbox = transforms.apply_box(np.array([bbox]))[0].clip(min=0)  # 先增加一个维度
+    # 格式：np.ndarray([[0, 1, 3, 4]])
     annotation["bbox"] = np.minimum(bbox, list(image_size + image_size)[::-1])
+    # np.minimum：(X, Y, out=None) X 与 Y 逐位比较取其小者，即防止边框越界
+    # [::-1]是因为image_size是(H, W)，而坐标是(X, Y)
     annotation["bbox_mode"] = BoxMode.XYXY_ABS
 
     if "segmentation" in annotation:
@@ -363,9 +368,10 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
     from instance annotations in the dataset dict.
 
     Args:
-        annos (list[dict]): a list of instance annotations in one image, each
-            element for one instance.
-        image_size (tuple): height, width
+        annos (list[dict]):
+            a list of instance annotations in one image, each element for one instance.
+        image_size (tuple):
+            height, width
 
     Returns:
         Instances:
@@ -375,6 +381,7 @@ def annotations_to_instances(annos, image_size, mask_format="polygon"):
     """
     boxes = [BoxMode.convert(obj["bbox"], obj["bbox_mode"], BoxMode.XYXY_ABS) for obj in annos]
     target = Instances(image_size)
+    # ? 哪儿将np数组转换的tensor？
     target.gt_boxes = Boxes(boxes)
 
     classes = [obj["category_id"] for obj in annos]
@@ -571,13 +578,15 @@ def build_augmentation(cfg, is_train):
         list[Augmentation]
     """
     if is_train:
-        min_size = cfg.INPUT.MIN_SIZE_TRAIN
-        max_size = cfg.INPUT.MAX_SIZE_TRAIN
-        sample_style = cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING
+        min_size = cfg.INPUT.MIN_SIZE_TRAIN  # (800,)
+        max_size = cfg.INPUT.MAX_SIZE_TRAIN  # 1333
+        sample_style = cfg.INPUT.MIN_SIZE_TRAIN_SAMPLING  # 'choice'
     else:
-        min_size = cfg.INPUT.MIN_SIZE_TEST
-        max_size = cfg.INPUT.MAX_SIZE_TEST
+        min_size = cfg.INPUT.MIN_SIZE_TEST  # 800
+        max_size = cfg.INPUT.MAX_SIZE_TEST  # 1333
         sample_style = "choice"
+    # todo
+    # * 默认两种图像扩增
     augmentation = [T.ResizeShortestEdge(min_size, max_size, sample_style)]
     if is_train:
         augmentation.append(T.RandomFlip())

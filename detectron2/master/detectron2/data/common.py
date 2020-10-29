@@ -65,13 +65,12 @@ class DatasetFromList(data.Dataset):
     def __init__(self, lst: list, copy: bool = True, serialize: bool = True):
         """
         Args:
-            lst (list): a list which contains elements to produce.
-            copy (bool): whether to deepcopy the element when producing it,
-                so that the result can be modified in place without affecting the
-                source in the list.
-            serialize (bool): whether to hold memory using serialized objects, when
-                enabled, data loader workers can use shared RAM from master
-                process instead of making a copy.
+            lst (list):
+                a list which contains elements to produce.
+            copy (bool):
+                whether to deepcopy the element when producing it, so that the result can be modified in place without affecting the source in the list.
+            serialize (bool):
+                whether to hold memory using serialized objects, when enabled, data loader workers can use shared RAM from master process instead of making a copy.
         """
         self._lst = lst
         self._copy = copy
